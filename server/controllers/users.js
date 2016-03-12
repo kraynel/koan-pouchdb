@@ -5,7 +5,7 @@
  */
 
 var route = require('koa-route'),
-    mongo = require('../config/mongo');
+    pouchdb = require('../config/pouchdb');
 
 // register koa routes
 exports.init = function (app) {
@@ -22,9 +22,8 @@ function *createUser() {
 
   // get the latest userId+1 as the new user id
   // this is exceptional to user creation as we want user ids to be sequential numbers and not standard mongo guids
-  user._id = yield mongo.getNextSequence('userId');
-  var results = yield mongo.users.insertOne(user);
-  
+  var results = yield pouchdb.users.post(user);
+
   this.status = 201;
-  this.body = {id: results.ops[0]._id};
+  this.body = {id: results._id};
 }

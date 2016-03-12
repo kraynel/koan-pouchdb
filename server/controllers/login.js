@@ -9,7 +9,7 @@ var qs = require('querystring'),
     jwt = require('koa-jwt'),
     request = require('co-request'),
     config = require('../config/config'),
-    mongo = require('../config/mongo');
+    pouchdb = require('../config/pouchdb');
 
 // register koa routes
 exports.init = function (app) {
@@ -20,22 +20,33 @@ exports.init = function (app) {
   app.use(route.get('/login/google/callback', googleCallback));
 };
 
+function *getUserByEmail(emailToFind) {
+  yield pouchdb.users.createIndex({
+    index: {
+      fields: ['email']
+    }
+  })
+  var queryResults = yield pouchdb.users.find({
+    selector: {email: emailToFind}
+  });
+  if(queryResults.docs.length > 0) {
+    return queryResults.docs[0];
+  }
+}
+
 /**
  * Receives the user credentials and returns a JSON Web Token along with user profile info in JSON format.
  */
 function *login() {
   var credentials = this.request.body;
-  var user = yield mongo.users.findOne({email: credentials.email}, {email: 1, name: 1, password: 1});
-
-  if (!user) {
+  var user = yield getUserByEmail(credentials.email);
+  if(!user) {
     this.throw(401, 'Incorrect e-mail address.');
   } else if (user.password !== credentials.password) {
     this.throw(401, 'Incorrect password.');
   } else {
-    user.id = user._id;
-    delete user._id;
     delete user.password;
-    user.picture = '/api/users/' + user.id + '/picture';
+    user.picture = '/api/users/' + user._id + '/picture';
   }
 
   // sign and send the token along with the user info
@@ -76,20 +87,20 @@ function *facebookCallback() {
   // get user profile (including email address) from facebook and save user data in our database if necessary
   var profileResponse = yield request.get('https://graph.facebook.com/me?fields=name,email,picture&access_token=' + token.access_token);
   var profile = JSON.parse(profileResponse.body);
-  var user = yield mongo.users.findOne({email: profile.email}, {email: 1, name: 1});
+
+  var user = yield getUserByEmail(profile.email);
+  console.log('FB existing user?', user);
   if (!user) {
     user = {
-      _id: (yield mongo.getNextSequence('userId')),
       email: profile.email,
       name: profile.name,
       picture: (yield request.get(profile.picture.data.url, {encoding: 'base64'})).body
     };
-    var results = yield mongo.users.insert(user);
+    var results = yield pouchdb.users.post(user);
   }
-
-  // redirect the user to index page along with user profile object as query string
   user.id = user._id;
   delete user._id;
+  // redirect the user to index page along with user profile object as query string
   user.picture = '/api/users/' + user.id + '/picture';
   var token = jwt.sign(user, config.app.secret, {expiresInMinutes: 90 * 24 * 60 /* 90 days */});
   this.redirect('/?user=' + encodeURIComponent(JSON.stringify({token: token, user: user})));
@@ -127,20 +138,18 @@ function *googleCallback() {
   // get user profile (including email address) from facebook and save user data in our database if necessary
   var profileResponse = yield request.get('https://www.googleapis.com/plus/v1/people/me?access_token=' + token.access_token);
   var profile = JSON.parse(profileResponse.body);
-  var user = yield mongo.users.findOne({email: profile.emails[0].value}, {email: 1, name: 1});
+  var user = yield getUserByEmail(profile.emails[0].value);
   if (!user) {
     user = {
-      _id: (yield mongo.getNextSequence('userId')),
       email: profile.emails[0].value,
       name: profile.displayName,
       picture: (yield request.get(profile.image.url, {encoding: 'base64'})).body
     };
-    var results = yield mongo.users.insert(user);
+    var results = yield pouchdb.users.post(user);
   }
-
-  // redirect the user to index page along with user profile object as query string
   user.id = user._id;
   delete user._id;
+  // redirect the user to index page along with user profile object as query string
   user.picture = '/api/users/' + user.id + '/picture';
   var token = jwt.sign(user, config.app.secret, {expiresInMinutes: 90 * 24 * 60 /* 90 days */});
   this.redirect('/?user=' + encodeURIComponent(JSON.stringify({token: token, user: user})));

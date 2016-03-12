@@ -25,6 +25,9 @@ var platformConfig = {
     mongo: {
       url: 'mongodb://localhost:27017/koan-dev'
     },
+    couchdb: {
+      url: 'http://localhost:5984'
+    },
     oauth: {
       facebook: {
         clientId: '231235687068678',
@@ -45,6 +48,9 @@ var platformConfig = {
     },
     mongo: {
       url: 'mongodb://localhost:27017/koan-test'
+    },
+    couchdb: {
+      url: 'http://localhost:5984/test-users'
     }
   },
 
@@ -55,6 +61,9 @@ var platformConfig = {
     },
     mongo: {
       url: process.env.MONGOHQ_URL || process.env.MONGOLAB_URI || 'mongodb://localhost:27017/koan'
+    },
+    couchdb: {
+      url:  process.env.COUCHHQ_URL || process.env.COUCHLAB_URI || 'http://localhost:5984/users'
     },
     oauth: {
       facebook: {

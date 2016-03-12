@@ -5,16 +5,15 @@
  */
 
 var route = require('koa-route'),
-    config = require('../config/config'),
-    mongoSeed = require('../config/mongo-seed');
+    config = require('../config/config');
 
 // register koa routes
 exports.init = function (app) {
-  app.use(route.post('/api/debug/clearDatabase', clearDatabase));
+  // app.use(route.post('/api/debug/clearDatabase', clearDatabase));
 };
 
-function *clearDatabase() {
-  // todo: check user role === 'admin' when role system is ready
-  yield mongoSeed(true);
-  this.status = 200;
-}
+// function *clearDatabase() {
+//   // todo: check user role === 'admin' when role system is ready
+//   yield mongoSeed(true);
+//   this.status = 200;
+// }

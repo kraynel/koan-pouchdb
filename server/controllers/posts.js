@@ -5,9 +5,9 @@
  */
 
 var route = require('koa-route'),
-    mongo = require('../config/mongo'),
+    pouchdb = require('../config/pouchdb'),
     ws = require('../config/ws'),
-    ObjectID = mongo.ObjectID;
+    _ = require('lodash')
 
 // register koa routes
 exports.init = function (app) {
@@ -20,17 +20,23 @@ exports.init = function (app) {
  * Lists last 15 posts with latest 15 comments in them.
  */
 function *listPosts() {
-  var posts = yield mongo.posts.find(
-      {},
-      {comments: {$slice: -15 /* only get last x many comments for each post */}},
-      {limit: 15, sort: {_id: -1}} /* only get last 15 posts by last updated */).toArray();
-
-  posts.forEach(function (post) {
-    post.id = post._id;
-    delete post._id;
+  yield pouchdb.posts.createIndex({
+    index: {
+      fields: ['createdTime']
+    }
+  })
+  var posts = yield pouchdb.posts.find({
+    selector: {
+        createdTime: {'$exists': true}
+      },
+      sort: [{createdTime: 'desc'}]
+    });
+  console.log(posts);
+  this.body = _.map(posts.docs, function(doc){
+    doc.id = doc._id;
+    delete doc._id;
+    return doc;
   });
-
-  this.body = posts;
 }
 
 /**
@@ -41,14 +47,14 @@ function *createPost() {
   var post = this.request.body;
   post.from = this.state.user; // user info is stored in 'this.state.user' field after successful login, as suggested by Koa docs: http://koajs.com/#ctx-state
   post.createdTime = new Date();
-  var results = yield mongo.posts.insertOne(post);
+  post.comments = [];
+  var results = yield pouchdb.posts.post(post);
 
   this.status = 201;
-  this.body = {id: results.ops[0]._id};
+  post.id = results.id;
+  this.body = post;
 
   // now notify everyone about this new post
-  post.id = post._id;
-  delete post._id;
   ws.notify('posts.created', post);
 }
 
@@ -57,23 +63,23 @@ function *createPost() {
  * @param postId - Post ID.
  */
 function *createComment(postId) {
-  postId = new ObjectID(postId);
-  var comment = this.request.body;
-  var commentId = new ObjectID();
-
+  var now = new Date();
+  var comment = {
+    id: now,
+    from: this.state.user,
+    createdTime: now,
+    message: this.request.body.message,
+    postId: postId
+  };
+  var post = yield pouchdb.posts.get(postId);
   // update post document with the new comment
-  comment = {_id: commentId, from: this.state.user, createdTime: new Date(), message: comment.message};
-  var result = yield mongo.posts.update(
-      {_id: postId},
-      {$push: {comments: comment}}
-  );
 
+  post.comments.push(comment);
+
+  var result = yield pouchdb.posts.post(post);
   this.status = 201;
-  this.body = {id: commentId};
+  this.body = comment;
 
   // now notify everyone about this new comment
-  comment.id = comment._id;
-  comment.postId = postId;
-  delete comment._id;
   ws.notify('posts.comments.created', comment);
 }

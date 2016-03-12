@@ -5,8 +5,7 @@
  */
 
 var config = require('./server/config/config'),
-    mongo = require('./server/config/mongo'),
-    mongoSeed = require('./server/config/mongo-seed'),
+    pouchdb = require('./server/config/pouchdb'),
     koaConfig = require('./server/config/koa'),
     ws = require('./server/config/ws'),
     co = require('co'),
@@ -20,9 +19,7 @@ module.exports = app;
  * @param overwriteDB Overwrite existing database with the seed data. Useful for testing environment.
  */
 app.init = co.wrap(function *(overwriteDB) {
-  // initialize mongodb and populate the database with seed data if empty
-  yield mongo.connect();
-  yield mongoSeed(overwriteDB);
+  // yield mongoSeed(overwriteDB);
 
   // koa config
   koaConfig(app);

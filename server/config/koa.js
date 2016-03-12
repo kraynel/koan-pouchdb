@@ -22,6 +22,7 @@ module.exports = function (app) {
     methods: 'GET, HEAD, OPTIONS, PUT, POST, DELETE',
     headers: 'Origin, X-Requested-With, Content-Type, Accept, Authorization'
   }));
+
   app.use(bodyParser());
 
   // register special controllers which should come before any jwt token check and be publicly accessible

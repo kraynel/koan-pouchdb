@@ -6,7 +6,7 @@
 
 var route = require('koa-route'),
     config = require('../config/config'),
-    mongo = require('../config/mongo');
+    pouchdb = require('../config/pouchdb');
 
 // register koa routes
 exports.init = function (app) {
@@ -18,8 +18,7 @@ exports.init = function (app) {
  * @param id - User ID.
  */
 function *getPicture(id) {
-  id = parseInt(id);
-  var user = yield mongo.users.findOne({_id: id}, {picture: 1});
+  var user = yield pouchdb.users.get(id);
   if (user) {
     var img = new Buffer(user.picture, 'base64');
     this.set('Content-Type', 'image/jpeg');
